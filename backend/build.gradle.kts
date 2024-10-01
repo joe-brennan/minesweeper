@@ -13,5 +13,5 @@ dependencies {
 }
 
 application {
-    mainClass.set("com.joe-brennan.minesweeper.ApplicationKt")
+    mainClass.set("com.joe_brennan.minesweeper.ApplicationKt")
 }

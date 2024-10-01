@@ -1,58 +1,197 @@
 <template>
-  <div class="hello">
-    <h1>{{ msg }}</h1>
-    <p>
-      For a guide and recipes on how to configure / customize this project,<br>
-      check out the
-      <a href="https://cli.vuejs.org" target="_blank" rel="noopener">vue-cli documentation</a>.
-    </p>
-    <h3>Installed CLI Plugins</h3>
-    <ul>
-      <li><a href="https://github.com/vuejs/vue-cli/tree/dev/packages/%40vue/cli-plugin-babel" target="_blank" rel="noopener">babel</a></li>
-      <li><a href="https://github.com/vuejs/vue-cli/tree/dev/packages/%40vue/cli-plugin-eslint" target="_blank" rel="noopener">eslint</a></li>
-    </ul>
-    <h3>Essential Links</h3>
-    <ul>
-      <li><a href="https://vuejs.org" target="_blank" rel="noopener">Core Docs</a></li>
-      <li><a href="https://forum.vuejs.org" target="_blank" rel="noopener">Forum</a></li>
-      <li><a href="https://chat.vuejs.org" target="_blank" rel="noopener">Community Chat</a></li>
-      <li><a href="https://twitter.com/vuejs" target="_blank" rel="noopener">Twitter</a></li>
-      <li><a href="https://news.vuejs.org" target="_blank" rel="noopener">News</a></li>
-    </ul>
-    <h3>Ecosystem</h3>
-    <ul>
-      <li><a href="https://router.vuejs.org" target="_blank" rel="noopener">vue-router</a></li>
-      <li><a href="https://vuex.vuejs.org" target="_blank" rel="noopener">vuex</a></li>
-      <li><a href="https://github.com/vuejs/vue-devtools#vue-devtools" target="_blank" rel="noopener">vue-devtools</a></li>
-      <li><a href="https://vue-loader.vuejs.org" target="_blank" rel="noopener">vue-loader</a></li>
-      <li><a href="https://github.com/vuejs/awesome-vue" target="_blank" rel="noopener">awesome-vue</a></li>
-    </ul>
+  <div class="minesweeper-container">
+    <div class="controls">
+      <button @click="changeGridSize(10, 10)">10x10 Grid</button>
+      <button @click="changeGridSize(50, 50)">50x50 Grid</button>
+      <span>Mines: {{ mineCount }}</span>
+    </div>
+    <div class="minesweeper-grid" :style="gridStyle">
+      <div v-for="(row, rowIndex) in grid" :key="rowIndex" class="row">
+        <div
+            v-for="(cell, colIndex) in row"
+            :key="`${rowIndex}-${colIndex}`"
+            class="cell"
+            :class="{ 'revealed': cell.isRevealed, 'flagged': cell.isFlagged }"
+            @click="revealCell(rowIndex, colIndex)"
+            @contextmenu.prevent="flagCell(rowIndex, colIndex)"
+        >
+          {{ getCellContent(cell) }}
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
 export default {
-  name: 'HelloWorld',
-  props: {
-    msg: String
+  data() {
+    return {
+      grid: [],
+      rows: 10,
+      cols: 10,
+      mineCount: 0,
+      gameOver: false
+    };
+  },
+  computed: {
+    gridStyle() {
+      return {
+        display: 'grid',
+        gridTemplateColumns: `repeat(${this.cols}, 20px)`,
+        gridTemplateRows: `repeat(${this.rows}, 20px)`
+      };
+    }
+  },
+  methods: {
+    initializeGrid(rows, cols) {
+      this.rows = rows;
+      this.cols = cols;
+      this.mineCount = Math.floor(rows * cols * 0.15); // 15% of cells are mines
+      this.grid = [];
+      this.gameOver = false;
+
+      // Create empty grid
+      for (let i = 0; i < rows; i++) {
+        this.grid.push([]);
+        for (let j = 0; j < cols; j++) {
+          this.grid[i].push({
+            isMine: false,
+            isRevealed: false,
+            isFlagged: false,
+            neighborMines: 0
+          });
+        }
+      }
+
+      // Place mines
+      let minesPlaced = 0;
+      while (minesPlaced < this.mineCount) {
+        const row = Math.floor(Math.random() * rows);
+        const col = Math.floor(Math.random() * cols);
+        if (!this.grid[row][col].isMine) {
+          this.grid[row][col].isMine = true;
+          minesPlaced++;
+        }
+      }
+
+      // Calculate neighbor mines
+      for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
+          if (!this.grid[i][j].isMine) {
+            this.grid[i][j].neighborMines = this.countNeighborMines(i, j);
+          }
+        }
+      }
+    },
+    countNeighborMines(row, col) {
+      let count = 0;
+      for (let i = -1; i <= 1; i++) {
+        for (let j = -1; j <= 1; j++) {
+          if (i === 0 && j === 0) continue;
+          const newRow = row + i;
+          const newCol = col + j;
+          if (newRow >= 0 && newRow < this.rows && newCol >= 0 && newCol < this.cols) {
+            if (this.grid[newRow][newCol].isMine) count++;
+          }
+        }
+      }
+      return count;
+    },
+    revealCell(row, col) {
+      if (this.gameOver || this.grid[row][col].isRevealed || this.grid[row][col].isFlagged) return;
+
+      this.grid[row][col].isRevealed = true;
+
+      if (this.grid[row][col].isMine) {
+        this.gameOver = true;
+        alert('Game Over! You hit a mine!');
+        return;
+      }
+
+      if (this.grid[row][col].neighborMines === 0) {
+        this.revealNeighbors(row, col);
+      }
+
+      if (this.checkWin()) {
+        this.gameOver = true;
+        alert('Congratulations! You won!');
+      }
+    },
+    revealNeighbors(row, col) {
+      for (let i = -1; i <= 1; i++) {
+        for (let j = -1; j <= 1; j++) {
+          if (i === 0 && j === 0) continue;
+          const newRow = row + i;
+          const newCol = col + j;
+          if (newRow >= 0 && newRow < this.rows && newCol >= 0 && newCol < this.cols) {
+            if (!this.grid[newRow][newCol].isRevealed && !this.grid[newRow][newCol].isFlagged) {
+              this.revealCell(newRow, newCol);
+            }
+          }
+        }
+      }
+    },
+    flagCell(row, col) {
+      if (this.gameOver || this.grid[row][col].isRevealed) return;
+      this.grid[row][col].isFlagged = !this.grid[row][col].isFlagged;
+    },
+    getCellContent(cell) {
+      if (!cell.isRevealed) return cell.isFlagged ? '🚩' : '';
+      if (cell.isMine) return '💣';
+      return cell.neighborMines > 0 ? cell.neighborMines : '';
+    },
+    changeGridSize(rows, cols) {
+      this.initializeGrid(rows, cols);
+    },
+    checkWin() {
+      for (let i = 0; i < this.rows; i++) {
+        for (let j = 0; j < this.cols; j++) {
+          if (!this.grid[i][j].isMine && !this.grid[i][j].isRevealed) {
+            return false;
+          }
+        }
+      }
+      return true;
+    }
+  },
+  mounted() {
+    this.initializeGrid(this.rows, this.cols);
   }
-}
+};
 </script>
 
-<!-- Add "scoped" attribute to limit CSS to this component only -->
 <style scoped>
-h3 {
-  margin: 40px 0 0;
+.minesweeper-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
-ul {
-  list-style-type: none;
-  padding: 0;
+
+.controls {
+  margin-bottom: 10px;
 }
-li {
-  display: inline-block;
-  margin: 0 10px;
+
+.minesweeper-grid {
+  border: 1px solid #ccc;
 }
-a {
-  color: #42b983;
+
+.cell {
+  width: 20px;
+  height: 20px;
+  border: 1px solid #ccc;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: bold;
+  cursor: pointer;
+  user-select: none;
+}
+
+.cell.revealed {
+  background-color: #eee;
+}
+
+.cell.flagged {
+  background-color: #ffd700;
 }
 </style>
